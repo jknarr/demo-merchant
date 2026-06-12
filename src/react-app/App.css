@@ -1,45 +1,797 @@
+/* Jimporium — Amazon-inspired layout */
+
+:root {
+	--jp-navy: #131921;
+	--jp-navy-2: #232f3e;
+	--jp-orange: #ff9900;
+	--jp-orange-hover: #f08804;
+	--jp-yellow: #febd69;
+	--jp-yellow-hover: #f3a847;
+	--jp-link: #007185;
+	--jp-link-hover: #c45500;
+	--jp-price: #b12704;
+	--jp-bg: #eaeded;
+	--jp-card: #ffffff;
+	--jp-border: #d5d9d9;
+	--jp-text: #0f1111;
+	--jp-text-muted: #565959;
+	--jp-success: #007600;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
 #root {
-	max-width: 1280px;
-	margin: 0 auto;
-	padding: 2rem;
+	margin: 0;
+	padding: 0;
+	min-height: 100vh;
+	width: 100%;
+}
+
+body {
+	background: var(--jp-bg);
+	color: var(--jp-text);
+	font-family:
+		"Amazon Ember", Arial, Helvetica, sans-serif;
+}
+
+#root {
+	max-width: none;
+	padding: 0;
+	text-align: left;
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+}
+
+a {
+	color: var(--jp-link);
+	text-decoration: none;
+}
+a:hover {
+	color: var(--jp-link-hover);
+	text-decoration: underline;
+}
+
+/* ---------- Header ---------- */
+
+.jp-header {
+	background: var(--jp-navy);
+	color: #fff;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 14px;
+}
+
+.jp-header__logo {
+	font-size: 26px;
+	font-weight: 800;
+	color: #fff;
+	letter-spacing: -0.5px;
+	padding: 6px 8px;
+	border: 1px solid transparent;
+	border-radius: 2px;
+	cursor: pointer;
+	background: none;
+}
+.jp-header__logo:hover {
+	border-color: #fff;
+}
+.jp-header__logo .accent {
+	color: var(--jp-orange);
+}
+
+.jp-header__deliver {
+	font-size: 12px;
+	color: #cfd7df;
+	line-height: 1.1;
+	padding: 8px 4px;
+	border: 1px solid transparent;
+	border-radius: 2px;
+	cursor: pointer;
+}
+.jp-header__deliver:hover {
+	border-color: #fff;
+}
+.jp-header__deliver strong {
+	color: #fff;
+	font-size: 14px;
+}
+
+.jp-search {
+	flex: 1;
+	display: flex;
+	height: 40px;
+	border-radius: 4px;
+	overflow: hidden;
+	margin: 0 8px;
+	min-width: 0;
+}
+.jp-search__cat {
+	background: #f3f3f3;
+	color: #555;
+	border: none;
+	padding: 0 8px;
+	font-size: 12px;
+	cursor: pointer;
+	border-right: 1px solid #cdcdcd;
+}
+.jp-search__input {
+	flex: 1;
+	border: none;
+	padding: 0 12px;
+	font-size: 15px;
+	min-width: 0;
+	outline: none;
+}
+.jp-search__btn {
+	background: var(--jp-yellow);
+	border: none;
+	padding: 0 18px;
+	cursor: pointer;
+	font-size: 18px;
+}
+.jp-search__btn:hover {
+	background: var(--jp-yellow-hover);
+}
+
+.jp-header__right {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.jp-header__item {
+	color: #fff;
+	background: none;
+	border: 1px solid transparent;
+	padding: 8px 10px;
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1.2;
+	border-radius: 2px;
+	text-align: left;
+}
+.jp-header__item:hover {
+	border-color: #fff;
+}
+.jp-header__item small {
+	display: block;
+	font-size: 12px;
+	color: #cfd7df;
+}
+
+.jp-cart-btn {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-weight: 700;
+}
+.jp-cart-btn__count {
+	color: var(--jp-orange);
+	font-weight: 800;
+	font-size: 16px;
+}
+
+/* ---------- Sub-nav ---------- */
+
+.jp-subnav {
+	background: var(--jp-navy-2);
+	color: #fff;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	overflow-x: auto;
+}
+.jp-subnav button {
+	background: none;
+	border: 1px solid transparent;
+	color: #fff;
+	font-size: 14px;
+	padding: 8px 10px;
+	cursor: pointer;
+	border-radius: 2px;
+	white-space: nowrap;
+}
+.jp-subnav button:hover {
+	border-color: #fff;
+}
+.jp-subnav button.active {
+	border-color: #fff;
+	font-weight: 700;
+}
+
+/* ---------- Hero ---------- */
+
+.jp-hero {
+	background: linear-gradient(180deg, #cce4ff 0%, #e3f0ff 60%, var(--jp-bg) 100%);
+	padding: 28px 24px;
+	margin: -2px 0 0 0;
+}
+.jp-hero h1 {
+	margin: 0 0 6px 0;
+	font-size: 28px;
+}
+.jp-hero p {
+	margin: 0;
+	color: var(--jp-text-muted);
+}
+
+/* ---------- Layout ---------- */
+
+.jp-main {
+	flex: 1;
+	padding: 14px;
+}
+
+.jp-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 14px;
+}
+
+/* ---------- Product card ---------- */
+
+.jp-card {
+	background: var(--jp-card);
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	cursor: pointer;
+	transition: box-shadow 120ms ease;
+}
+.jp-card:hover {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.jp-card__img {
+	height: 130px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 80px;
+	background: #fafafa;
+	border-radius: 4px;
+}
+.jp-card__title {
+	font-size: 14px;
+	line-height: 1.3;
+	color: var(--jp-text);
+	margin: 0;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.jp-card__title:hover {
+	color: var(--jp-link-hover);
+}
+.jp-card__rating {
+	font-size: 13px;
+	color: var(--jp-text-muted);
+}
+.jp-stars {
+	color: var(--jp-orange);
+	margin-right: 6px;
+	letter-spacing: 1px;
+}
+.jp-card__price {
+	font-size: 18px;
+	color: var(--jp-text);
+}
+.jp-card__price .currency {
+	font-size: 12px;
+	vertical-align: super;
+}
+.jp-card__prime {
+	font-size: 12px;
+	color: #007185;
+	font-weight: 700;
+}
+
+/* ---------- Product detail ---------- */
+
+.jp-detail {
+	background: var(--jp-card);
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 24px;
+	display: grid;
+	grid-template-columns: 1fr 1fr 280px;
+	gap: 24px;
+}
+.jp-detail__img {
+	font-size: 200px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #fafafa;
+	border-radius: 6px;
+	min-height: 360px;
+}
+.jp-detail__info h2 {
+	font-size: 22px;
+	margin: 0 0 8px 0;
+	color: var(--jp-text);
+}
+.jp-detail__info .rating-row {
+	margin: 8px 0;
+	font-size: 14px;
+}
+.jp-detail__info hr {
+	border: none;
+	border-top: 1px solid var(--jp-border);
+	margin: 14px 0;
+}
+.jp-detail__price {
+	font-size: 28px;
+	color: var(--jp-text);
+}
+.jp-detail__buybox {
+	background: #fff;
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 18px;
+	height: fit-content;
+}
+.jp-detail__buybox .stock {
+	color: var(--jp-success);
+	font-size: 16px;
+	font-weight: 500;
+	margin-bottom: 10px;
+}
+.jp-detail__buybox select {
+	width: 100%;
+	padding: 6px;
+	margin-bottom: 10px;
+	border-radius: 8px;
+	border: 1px solid var(--jp-border);
+	background: #f0f2f2;
+}
+
+/* ---------- Buttons ---------- */
+
+button {
+	font-family: inherit;
+}
+
+.jp-btn {
+	background: var(--jp-yellow);
+	border: 1px solid #a88734;
+	border-radius: 100px;
+	padding: 8px 12px;
+	font-size: 14px;
+	cursor: pointer;
+	width: 100%;
+	margin-bottom: 8px;
+	color: var(--jp-text);
+}
+.jp-btn:hover {
+	background: var(--jp-yellow-hover);
+}
+.jp-btn--primary {
+	background: var(--jp-orange);
+	border-color: #a88734;
+	color: #111;
+	font-weight: 600;
+}
+.jp-btn--primary:hover {
+	background: var(--jp-orange-hover);
+}
+.jp-btn--secondary {
+	background: #e7e9ec;
+	border-color: #adb1b8;
+}
+
+/* ---------- Cart & checkout ---------- */
+
+.jp-page {
+	display: grid;
+	grid-template-columns: 1fr 320px;
+	gap: 14px;
+}
+.jp-panel {
+	background: var(--jp-card);
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 18px;
+}
+.jp-panel h2 {
+	margin: 0 0 12px 0;
+	font-size: 22px;
+}
+
+.jp-cart-row {
+	display: grid;
+	grid-template-columns: 100px 1fr auto;
+	gap: 14px;
+	padding: 14px 0;
+	border-bottom: 1px solid var(--jp-border);
+	align-items: center;
+}
+.jp-cart-row:last-child {
+	border-bottom: none;
+}
+.jp-cart-row__img {
+	font-size: 60px;
+	text-align: center;
+	background: #fafafa;
+	border-radius: 6px;
+	padding: 8px 0;
+}
+.jp-cart-row__title {
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 6px 0;
+}
+.jp-cart-row__price {
+	font-size: 18px;
+}
+.jp-cart-row__controls {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 6px;
+	font-size: 13px;
+}
+.jp-cart-row__controls select {
+	padding: 4px;
+	border-radius: 6px;
+	border: 1px solid var(--jp-border);
+}
+.jp-link {
+	background: none;
+	border: none;
+	color: var(--jp-link);
+	cursor: pointer;
+	padding: 0;
+	font-size: 13px;
+}
+.jp-link:hover {
+	color: var(--jp-link-hover);
+	text-decoration: underline;
+}
+
+.jp-subtotal {
+	font-size: 15px;
+	margin-top: 14px;
+}
+.jp-subtotal strong {
+	font-size: 18px;
+}
+
+.jp-summary-row {
+	display: flex;
+	justify-content: space-between;
+	margin: 8px 0;
+	font-size: 14px;
+}
+.jp-summary-row--total {
+	font-weight: 700;
+	font-size: 18px;
+	color: var(--jp-price);
+	border-top: 1px solid var(--jp-border);
+	padding-top: 10px;
+	margin-top: 14px;
+}
+
+/* ---------- Checkout ---------- */
+
+.jp-checkout-grid {
+	display: grid;
+	grid-template-columns: 1fr 340px;
+	gap: 14px;
+}
+.jp-section {
+	background: #fff;
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 18px;
+	margin-bottom: 14px;
+}
+.jp-section h3 {
+	margin: 0 0 10px 0;
+	font-size: 17px;
+}
+.jp-form-row {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+.jp-form-row label {
+	font-size: 13px;
+	color: var(--jp-text-muted);
+}
+.jp-form-row input {
+	padding: 8px 10px;
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	font-size: 14px;
+}
+
+/* ---------- Paze button ---------- */
+
+.jp-paze-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	padding: 12px 16px;
+	border-radius: 100px;
+	border: 1px solid #0d2c54;
+	background: #1a3a6e;
+	color: #fff;
+	font-weight: 700;
+	font-size: 16px;
+	cursor: pointer;
+	margin-top: 12px;
+	letter-spacing: 0.5px;
+}
+.jp-paze-btn:hover {
+	background: #224b8c;
+}
+.jp-paze-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+.jp-paze-btn__logo {
+	background: #fff;
+	color: #1a3a6e;
+	font-weight: 900;
+	border-radius: 3px;
+	padding: 2px 6px;
+	font-size: 13px;
+	letter-spacing: 0.5px;
+}
+
+.jp-paze-status {
+	margin-top: 10px;
+	padding: 10px 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	background: #f3f3f3;
+	border: 1px solid var(--jp-border);
+	color: var(--jp-text-muted);
+	white-space: pre-wrap;
+	font-family: ui-monospace, Menlo, monospace;
+}
+.jp-paze-status--err {
+	background: #fdecec;
+	border-color: #d8a0a0;
+	color: #8b1a1a;
+}
+.jp-paze-status--ok {
+	background: #e8f5e9;
+	border-color: #a4cba8;
+	color: #1f5d23;
+}
+
+/* ---------- Paze review panel ---------- */
+
+.jp-paze-review {
+	background: #fff;
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 16px 18px;
+	margin-bottom: 12px;
+}
+.jp-paze-review h3 {
+	font-size: 16px;
+	color: var(--jp-text);
+}
+.jp-paze-review__row {
+	display: grid;
+	grid-template-columns: 90px 1fr;
+	gap: 10px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--jp-border);
+	font-size: 14px;
+}
+.jp-paze-review__row:last-of-type {
+	border-bottom: none;
+}
+.jp-paze-review__label {
+	color: var(--jp-text-muted);
+	font-weight: 600;
+}
+.jp-paze-review__card {
+	display: inline-block;
+	background: #f3f7ff;
+	border: 1px solid #c6d6f0;
+	color: #1a3a6e;
+	border-radius: 4px;
+	padding: 3px 8px;
+	font-weight: 600;
+	font-size: 13px;
+}
+.jp-paze-review__totals {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid var(--jp-border);
+}
+
+/* ---------- Confirmation ---------- */
+
+.jp-confirm {
+	background: #fff;
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 32px;
 	text-align: center;
 }
-
-.logo {
-	height: 6em;
-	padding: 1.5em;
-	will-change: filter;
-	transition: filter 300ms;
-}
-.logo:hover {
-	filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-	filter: drop-shadow(0 0 2em #61dafbaa);
-}
-.logo.cloudflare:hover {
-	filter: drop-shadow(0 0 2em #f6821faa);
+.jp-confirm h2 {
+	color: var(--jp-success);
+	margin-top: 0;
 }
 
-@keyframes logo-spin {
-	from {
-		transform: rotate(0deg);
+/* ---------- Footer ---------- */
+
+.jp-footer {
+	background: var(--jp-navy-2);
+	color: #fff;
+	text-align: center;
+	padding: 22px 14px;
+	font-size: 13px;
+	margin-top: 24px;
+}
+.jp-footer .jp-footer__logo {
+	font-size: 22px;
+	font-weight: 800;
+	margin-bottom: 6px;
+}
+.jp-footer .jp-footer__logo .accent {
+	color: var(--jp-orange);
+}
+
+/* ---------- Empty state ---------- */
+
+.jp-empty {
+	background: #fff;
+	border: 1px solid var(--jp-border);
+	border-radius: 6px;
+	padding: 28px;
+	text-align: center;
+}
+.jp-empty h2 {
+	margin-top: 0;
+}
+
+/* ---------- Header wrapping (needed for mobile two-row layout) ---------- */
+
+.jp-header {
+	flex-wrap: wrap;
+}
+.jp-search {
+	min-width: 200px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+	.jp-detail {
+		grid-template-columns: 1fr;
 	}
-	to {
-		transform: rotate(360deg);
+	.jp-page,
+	.jp-checkout-grid {
+		grid-template-columns: 1fr;
+	}
+	.jp-detail__img {
+		font-size: 140px;
+		min-height: 240px;
 	}
 }
 
-@media (prefers-reduced-motion: no-preference) {
-	a:nth-of-type(2) .logo {
-		animation: logo-spin infinite 20s linear;
+@media (max-width: 700px) {
+	.jp-header__deliver {
+		display: none;
+	}
+	.jp-search {
+		flex-basis: 100%;
+		order: 99;
+		margin: 4px 0 0;
+	}
+	.jp-header__item:not(.jp-cart-btn) {
+		display: none;
+	}
+	.jp-grid {
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 10px;
+	}
+	.jp-card {
+		padding: 10px;
+	}
+	.jp-card__img {
+		height: 100px;
+		font-size: 56px;
+	}
+	.jp-card__title {
+		font-size: 13px;
+	}
+	.jp-card__price {
+		font-size: 16px;
+	}
+	.jp-hero {
+		padding: 18px 14px;
+	}
+	.jp-hero h1 {
+		font-size: 22px;
+	}
+	.jp-hero p {
+		font-size: 14px;
+	}
+	.jp-main {
+		padding: 10px;
+	}
+	.jp-panel,
+	.jp-section,
+	.jp-paze-review {
+		padding: 14px;
+	}
+	.jp-cart-row {
+		grid-template-columns: 70px 1fr;
+	}
+	.jp-cart-row__img {
+		font-size: 40px;
+	}
+	.jp-cart-row__price {
+		grid-column: 1 / -1;
+		text-align: right;
+		font-weight: 700;
+		font-size: 16px;
+	}
+	.jp-cart-row__title {
+		font-size: 14px;
+	}
+	.jp-detail {
+		padding: 14px;
+		gap: 14px;
+	}
+	.jp-detail__img {
+		font-size: 110px;
+		min-height: 180px;
+	}
+	.jp-detail__info h2 {
+		font-size: 18px;
+	}
+	.jp-detail__price {
+		font-size: 22px;
+	}
+	.jp-paze-review__row {
+		grid-template-columns: 1fr;
+		gap: 2px;
+	}
+	.jp-paze-review__label {
+		font-size: 12px;
+	}
+	.jp-form-row input {
+		font-size: 16px; /* prevent iOS auto-zoom on focus */
+	}
+	.jp-confirm {
+		padding: 20px;
 	}
 }
 
-.card {
-	padding: 2em;
-}
-
-.read-the-docs {
-	color: #888;
+@media (max-width: 420px) {
+	.jp-header {
+		padding: 6px 8px;
+	}
+	.jp-header__logo {
+		font-size: 20px;
+	}
+	.jp-cart-btn span:last-child {
+		display: none; /* hide the word "Cart", keep icon + count */
+	}
+	.jp-subnav button {
+		font-size: 13px;
+		padding: 6px 8px;
+	}
 }
