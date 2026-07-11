@@ -9,7 +9,7 @@
 //   https://developer.paze.com/public/docs/review-pay-websdk-guide
 
 const SANDBOX_SDK_URL =
-	"https://checkout.wallet.cat.earlywarning.io/web/resources/js/digitalwallet-sdk.js";
+	"https://checkout.wallet.uat.earlywarning.io/web/resources/js/digitalwallet-sdk.js";
 
 const PAZE_CLIENT_ID =
 	import.meta.env.VITE_PAZE_CLIENT_ID ??
