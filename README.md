@@ -70,3 +70,17 @@ Deploy the Worker with:
 ```bash
 npm run deploy
 ```
+
+The deployed Worker reads its public Paze configuration from `wrangler.json`:
+
+- `PAZE_CLIENT_ID`
+- `PAZE_PROFILE_ID`
+- `PAZE_HANDLER_MODULE_URL`
+- `PUBLIC_BASE_URL`
+
+`PAZE_MERCHANT_PRIVATE_KEY` is a Cloudflare Worker secret and must never be
+placed in `wrangler.json`. Upload it separately with:
+
+```bash
+npx wrangler secret put PAZE_MERCHANT_PRIVATE_KEY < /path/to/private-key.pem
+```

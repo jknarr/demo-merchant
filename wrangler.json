@@ -8,6 +8,15 @@
 		"enabled": true
 	},
 	"upload_source_maps": true,
+	"vars": {
+		"PAZE_CLIENT_ID": "N4O6FK3O3GSHT3KN47W713a0gK51EczMZpgRjKLMGvY40w3w0",
+		"PAZE_PROFILE_ID": "Jim",
+		"PAZE_HANDLER_MODULE_URL": "https://paze.jknarr.workers.dev/paze-handler.js",
+		"PUBLIC_BASE_URL": "https://demo-merchant.jknarr.workers.dev"
+	},
+	"secrets": {
+		"required": ["PAZE_MERCHANT_PRIVATE_KEY"]
+	},
 	"assets": {
 		"directory": "./dist/client",
 		"binding": "ASSETS",
