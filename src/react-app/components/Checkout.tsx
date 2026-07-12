@@ -1,6 +1,7 @@
 import { useCart } from "../context/CartContext";
 import { useNav } from "../context/NavContext";
 import { PazeButton, type PazeCompletionResult } from "./PazeButton";
+import { cartItemsToOrderLines } from "../order-lines";
 
 export function Checkout() {
 	const { items, subtotal, itemCount, clear } = useCart();
@@ -9,6 +10,7 @@ export function Checkout() {
 	const shipping = subtotal > 35 ? 0 : 5.99;
 	const tax = +(subtotal * 0.086).toFixed(2);
 	const total = +(subtotal + shipping + tax).toFixed(2);
+	const lineItems = cartItemsToOrderLines(items);
 
 	if (items.length === 0) {
 		return (
@@ -75,6 +77,7 @@ export function Checkout() {
 							tax={tax}
 							shipping={shipping}
 							total={total}
+							lineItems={lineItems}
 							onComplete={onPaymentComplete}
 						/>
 					</div>

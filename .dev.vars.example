@@ -1,0 +1,4 @@
+PAZE_CLIENT_ID="public-sdk-client-id"
+PAZE_PROFILE_ID="merchant-profile-id"
+PAZE_HANDLER_MODULE_URL="http://127.0.0.1:5175/src/browser.ts"
+PAZE_MERCHANT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"

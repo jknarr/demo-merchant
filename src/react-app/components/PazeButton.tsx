@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	canPazeCheckout,
-	getResolvedPazeSdk,
+	completePazePayment,
 	initializePaze,
-	pazeConfigSummary,
-	type PazeSdk,
-	type TransactionValue,
+	selectPazePayment,
+	type PazeBrowserSelection,
 } from "../paze/paze";
+import type { PazePaymentDisplay } from "../../shared/paze-payment";
+import type { OrderLineItem } from "../order-lines";
 
 declare module "react" {
+	// The Paze SDK registers a custom element that is not part of React's built-in JSX types.
+	// eslint-disable-next-line @typescript-eslint/no-namespace
 	namespace JSX {
 		interface IntrinsicElements {
 			"paze-button": React.DetailedHTMLProps<
@@ -24,51 +27,15 @@ declare module "react" {
 	}
 }
 
-type DecodedAddress = {
-	name?: string;
-	line1?: string;
-	line2?: string;
-	line3?: string;
-	city?: string;
-	state?: string;
-	zip?: string;
-	countryCode?: string;
-};
-
-type DecodedConsumer = {
-	firstName?: string;
-	lastName?: string;
-	fullName?: string;
-	emailAddress?: string;
-};
-
-type DecodedMaskedCard = {
-	panLastFour?: string;
-	paymentCardBrand?: string;
-	paymentCardType?: string;
-	paymentCardDescriptor?: string;
-	billingAddress?: DecodedAddress;
-};
-
-type DecodedCheckoutPayload = {
-	sessionId?: string;
-	consumer?: DecodedConsumer;
-	maskedCard?: DecodedMaskedCard;
-	shippingAddress?: DecodedAddress;
-};
-
 type Status =
 	| { kind: "idle" }
 	| { kind: "loading"; message: string }
-	| { kind: "info"; message: string }
 	| {
 			kind: "reviewing";
-			checkoutJws: string;
-			decoded: DecodedCheckoutPayload;
+				selection: PazeBrowserSelection;
 	  }
 	| { kind: "completing"; message: string }
-	| { kind: "error"; message: string }
-	| { kind: "success"; message: string };
+	| { kind: "error"; message: string };
 
 const CAN_CHECKOUT_DEBOUNCE_MS = 300;
 
@@ -84,33 +51,16 @@ function isValidEmail(email: string): boolean {
 	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function base64UrlDecode(input: string): string {
-	const padded = input.padEnd(input.length + ((4 - (input.length % 4)) % 4), "=");
-	const b64 = padded.replace(/-/g, "+").replace(/_/g, "/");
-	return atob(b64);
-}
-
-function decodeJwsPayload(jws: string): DecodedCheckoutPayload | null {
-	const parts = jws.split(".");
-	if (parts.length < 2) return null;
-	try {
-		const json = base64UrlDecode(parts[1]);
-		return JSON.parse(json) as DecodedCheckoutPayload;
-	} catch (err) {
-		console.warn("[paze] failed to decode checkoutResponse JWS:", err);
-		return null;
-	}
-}
-
-function formatAddress(addr?: DecodedAddress): string {
+function formatAddress(addr?: PazePaymentDisplay["shipping_address"]): string {
 	if (!addr) return "";
 	const parts = [
-		addr.name,
-		addr.line1,
-		addr.line2,
-		addr.line3,
-		[addr.city, addr.state, addr.zip].filter(Boolean).join(", "),
-		addr.countryCode,
+		[addr.first_name, addr.last_name].filter(Boolean).join(" "),
+		addr.street_address,
+		addr.extended_address,
+		[addr.address_locality, addr.address_region, addr.postal_code]
+			.filter(Boolean)
+			.join(", "),
+		addr.address_country,
 	].filter(Boolean);
 	return parts.join(" · ");
 }
@@ -129,6 +79,7 @@ export function PazeButton({
 	tax,
 	shipping,
 	total,
+	lineItems,
 	onComplete,
 }: {
 	email: string;
@@ -137,6 +88,7 @@ export function PazeButton({
 	tax: number;
 	shipping: number;
 	total: number;
+	lineItems: OrderLineItem[];
 	onComplete: (result: PazeCompletionResult) => void;
 }) {
 	const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -144,7 +96,6 @@ export function PazeButton({
 	const [walletDetected, setWalletDetected] = useState<boolean | null>(null);
 	const sessionIdRef = useRef<string>(`JIM-${Date.now()}`);
 	const buttonRef = useRef<HTMLElement | null>(null);
-	const sdkRef = useRef<PazeSdk | null>(null);
 
 	const normalizedEmail = email.trim().toLowerCase();
 	const normalizedMobile = mobileNumber.replace(/[^\d]/g, "");
@@ -153,12 +104,12 @@ export function PazeButton({
 	// Include every lookup key that's syntactically valid. Anything malformed
 	// or empty is omitted; if neither is provided, no lookup is sent and
 	// Paze collects the identifier inside its own popup.
-	const lookup: { emailAddress?: string; mobileNumber?: string } | null = (() => {
+	const lookup = useMemo<{ emailAddress?: string; mobileNumber?: string } | null>(() => {
 		const out: { emailAddress?: string; mobileNumber?: string } = {};
 		if (mobileValid) out.mobileNumber = normalizedMobile;
 		if (emailValid) out.emailAddress = normalizedEmail;
 		return Object.keys(out).length > 0 ? out : null;
-	})();
+	}, [emailValid, mobileValid, normalizedEmail, normalizedMobile]);
 	const lookupLabel =
 		[
 			mobileValid ? normalizedMobile : null,
@@ -169,16 +120,9 @@ export function PazeButton({
 
 	useEffect(() => {
 		let cancelled = false;
-		const existing = getResolvedPazeSdk();
-		if (existing) {
-			sdkRef.current = existing;
-			setReady(true);
-			return;
-		}
 		initializePaze()
-			.then((sdk) => {
+			.then(() => {
 				if (!cancelled) {
-					sdkRef.current = sdk;
 					setReady(true);
 				}
 			})
@@ -210,26 +154,31 @@ export function PazeButton({
 			cancelled = true;
 			window.clearTimeout(timer);
 		};
-	}, [ready, lookup?.emailAddress, lookup?.mobileNumber]);
+	}, [ready, lookup]);
 
 	// Per Paze SDK: transactionAmount must equal subtotal - discountAmount
 	// (merchandise total, before tax/shipping). Tax and shipping are sent
 	// as separate line items and the SDK displays them broken out.
-	const txnValue: TransactionValue = {
-		transactionCurrencyCode: "USD",
-		transactionAmount: subtotal.toFixed(2),
-		subtotal: subtotal.toFixed(2),
-		taxAmount: tax.toFixed(2),
-		shippingAmount: shipping.toFixed(2),
-	};
+	const ucpTotals = useMemo(
+		() => [
+			{ type: "subtotal", amount: Math.round(subtotal * 100) },
+			{ type: "fulfillment", amount: Math.round(shipping * 100) },
+			{ type: "tax", amount: Math.round(tax * 100) },
+			{ type: "total", amount: Math.round(total * 100) },
+		],
+		[shipping, subtotal, tax, total],
+	);
+	const handlerCheckout = useMemo(
+		() => ({ id: sessionIdRef.current, currency: "USD", totals: ucpTotals }),
+		[ucpTotals],
+	);
 
 	// CRITICAL: keep this handler synchronous up to and including the
 	// sdk.checkout() call. Any `await` before sdk.checkout() yields a
 	// microtask and breaks the user-gesture chain, causing the SDK's
 	// popup to be blocked.
 	const handleClick = useCallback(() => {
-		const sdk = sdkRef.current;
-		if (!sdk) {
+		if (!ready) {
 			setStatus({
 				kind: "error",
 				message: "Paze SDK not initialized yet. Try again in a moment.",
@@ -237,46 +186,16 @@ export function PazeButton({
 			return;
 		}
 
-		const sessionId = sessionIdRef.current;
 		setStatus({ kind: "loading", message: "Opening Paze..." });
 
-		const checkoutPromise = sdk.checkout({
-			...(lookup ?? {}),
-			sessionId,
-			actionCode: "START_FLOW",
-			intent: "REVIEW_AND_PAY",
-			transactionValue: txnValue,
-			shippingPreference: "ALL",
-			billingPreference: "ALL",
+		const checkoutPromise = selectPazePayment({
+			checkout: handlerCheckout,
+			lookup: lookup ?? undefined,
 		});
 
 		checkoutPromise
-			.then((checkoutResp) => {
-				console.log("[paze] checkout response:", checkoutResp);
-
-				if (checkoutResp?.result !== "COMPLETE") {
-					setStatus({
-						kind: "info",
-						message:
-							`Paze returned ${checkoutResp?.result ?? "no result"} — no popup was shown. ` +
-							"Per the docs this means the consumer was ineligible or cancelled. " +
-							"Try a Paze-provided sandbox test wallet credential.",
-					});
-					return;
-				}
-
-				const jws = checkoutResp.checkoutResponse;
-				if (!jws) {
-					setStatus({
-						kind: "error",
-						message:
-							"Paze returned COMPLETE but no checkoutResponse JWS was attached.",
-					});
-					return;
-				}
-				const decoded = decodeJwsPayload(jws) ?? {};
-				console.log("[paze] decoded checkoutResponse payload:", decoded);
-				setStatus({ kind: "reviewing", checkoutJws: jws, decoded });
+			.then((selection) => {
+				setStatus({ kind: "reviewing", selection });
 			})
 			.catch((err) => {
 				const e = err as Error & { code?: string };
@@ -286,72 +205,54 @@ export function PazeButton({
 					message: `Paze error${e.code ? ` (${e.code})` : ""}: ${e.message || String(err)}`,
 				});
 			});
-	}, [
-		lookup?.emailAddress,
-		lookup?.mobileNumber,
-		txnValue.transactionAmount,
-		txnValue.taxAmount,
-		txnValue.shippingAmount,
-	]);
+		}, [handlerCheckout, lookup, ready]);
 
 	const handleCompletePurchase = useCallback(async () => {
-		const sdk = sdkRef.current;
-		if (!sdk || status.kind !== "reviewing") return;
+		if (!ready || status.kind !== "reviewing") return;
 		const sessionId = sessionIdRef.current;
-		const checkoutJws = status.checkoutJws;
-		const card = status.decoded.maskedCard;
-		const consumer = status.decoded.consumer;
-		const buyerName =
-			consumer?.fullName ||
-			[consumer?.firstName, consumer?.lastName].filter(Boolean).join(" ") ||
-			undefined;
+		const display = status.selection.display;
 
 		setStatus({ kind: "completing", message: "Completing purchase..." });
 		try {
-			const completeResp = await sdk.complete({
-				transactionType: "PURCHASE",
-				sessionId,
-				transactionValue: txnValue,
-				transactionOptions: {
-					payloadTypeIndicator: "PAYMENT",
-					billingPreference: "ALL",
-				},
-				enhancedTransactionData: {
-					ecomData: {
-						cartContainsGiftCard: false,
-						orderForPickup: false,
-					},
-				},
+			const completed = await completePazePayment({
+				checkout: handlerCheckout,
+				selection: status.selection,
 			});
-			console.log("[paze] complete response:", completeResp);
-
-			const orderResp = await fetch("/api/orders", {
+				const orderResp = await fetch("/api/orders", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({
 					sessionId,
 					amount: total,
 					currency: "USD",
+					totals: ucpTotals,
+					lineItems,
 					emailAddress: normalizedEmail || undefined,
 					mobileNumber: normalizedMobile || undefined,
-					checkoutResponse: checkoutJws,
-					completeResponse: completeResp,
-				}),
+					payment: { instruments: [completed.instrument] },
+					}),
 			});
 			if (!orderResp.ok) {
-				throw new Error(`Order API returned ${orderResp.status}`);
+				const body = await orderResp.json().catch(() => null) as {
+					code?: string;
+					content?: string;
+				} | null;
+				throw new Error(
+					body?.content
+						? `${body.content} (${body.code ?? orderResp.status})`
+						: `Order API returned ${orderResp.status}`,
+				);
 			}
-			const order = (await orderResp.json()) as { orderId: string };
+			const order = (await orderResp.json()) as {
+				orderId?: string;
+				};
+				const resultId = order.orderId ?? sessionId;
 
-			setStatus({
-				kind: "success",
-				message: `Order ${order.orderId} — $${total.toFixed(2)} confirmed via Paze.`,
-			});
 			onComplete({
-				orderId: order.orderId,
-				cardBrand: card?.paymentCardBrand,
-				panLastFour: card?.panLastFour,
-				buyerName,
+				orderId: resultId,
+				cardBrand: display.card_network,
+				panLastFour: display.pan_last_four,
+				buyerName: display.buyer_name,
 			});
 		} catch (err) {
 			const e = err as Error & { code?: string };
@@ -361,7 +262,17 @@ export function PazeButton({
 				message: `Paze complete error${e.code ? ` (${e.code})` : ""}: ${e.message || String(err)}`,
 			});
 		}
-	}, [status, txnValue, total, normalizedEmail, normalizedMobile, onComplete]);
+	}, [
+		status,
+		handlerCheckout,
+		ucpTotals,
+		total,
+		lineItems,
+		normalizedEmail,
+		normalizedMobile,
+			onComplete,
+			ready,
+	]);
 
 	const handleCancelReview = useCallback(() => {
 		setStatus({ kind: "idle" });
@@ -394,14 +305,12 @@ export function PazeButton({
 	const showPazeButton =
 		status.kind === "idle" ||
 		status.kind === "loading" ||
-		status.kind === "info" ||
 		status.kind === "error";
-
 	return (
 		<div>
 			{status.kind === "reviewing" && (
 				<PazeReviewPanel
-					decoded={status.decoded}
+					display={status.selection.display}
 					subtotal={subtotal}
 					tax={tax}
 					shipping={shipping}
@@ -443,39 +352,17 @@ export function PazeButton({
 			{status.kind === "completing" && (
 				<div className="jp-paze-status">{status.message}</div>
 			)}
-			{status.kind === "info" && (
-				<div className="jp-paze-status">{status.message}</div>
-			)}
 			{status.kind === "error" && (
 				<div className="jp-paze-status jp-paze-status--err">
 					{status.message}
 				</div>
 			)}
-			{status.kind === "success" && (
-				<div className="jp-paze-status jp-paze-status--ok">{status.message}</div>
-			)}
-
-			<details
-				style={{
-					marginTop: 10,
-					fontSize: 12,
-					color: "var(--jp-text-muted)",
-				}}
-			>
-				<summary>Paze sandbox config</summary>
-				<pre style={{ whiteSpace: "pre-wrap", margin: "6px 0" }}>
-					{`clientId  : ${pazeConfigSummary.clientId}
-profileId : ${pazeConfigSummary.profileId}
-sdk       : ${pazeConfigSummary.sdkUrl}
-sessionId : ${sessionIdRef.current}`}
-				</pre>
-			</details>
 		</div>
 	);
 }
 
 function PazeReviewPanel({
-	decoded,
+	display,
 	subtotal,
 	tax,
 	shipping,
@@ -483,7 +370,7 @@ function PazeReviewPanel({
 	onCompletePurchase,
 	onCancel,
 }: {
-	decoded: DecodedCheckoutPayload;
+	display: PazePaymentDisplay;
 	subtotal: number;
 	tax: number;
 	shipping: number;
@@ -491,11 +378,8 @@ function PazeReviewPanel({
 	onCompletePurchase: () => void;
 	onCancel: () => void;
 }) {
-	const card = decoded.maskedCard;
-	const ship = decoded.shippingAddress;
-	const consumer = decoded.consumer;
-	const cardLabel = card
-		? `${card.paymentCardBrand ?? "Card"} ${card.paymentCardType ? `(${card.paymentCardType})` : ""} ending in ${card.panLastFour ?? "????"}`
+	const cardLabel = display.card_network || display.pan_last_four
+		? `${display.card_network ?? "Card"} ending in ${display.pan_last_four ?? "????"}`
 		: "Selected Paze card";
 
 	return (
@@ -505,12 +389,7 @@ function PazeReviewPanel({
 			<div className="jp-paze-review__row">
 				<div className="jp-paze-review__label">Buyer</div>
 				<div className="jp-paze-review__value">
-					{consumer?.fullName ||
-						[consumer?.firstName, consumer?.lastName]
-							.filter(Boolean)
-							.join(" ") ||
-						"—"}
-					{consumer?.emailAddress ? ` · ${consumer.emailAddress}` : ""}
+					{display.buyer_name ?? "—"}
 				</div>
 			</div>
 
@@ -524,7 +403,7 @@ function PazeReviewPanel({
 			<div className="jp-paze-review__row">
 				<div className="jp-paze-review__label">Ship to</div>
 				<div className="jp-paze-review__value">
-					{formatAddress(ship) || "—"}
+					{formatAddress(display.shipping_address) || "—"}
 				</div>
 			</div>
 

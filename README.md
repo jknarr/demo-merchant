@@ -1,90 +1,72 @@
-# React + Vite + Hono + Cloudflare Workers
+# Jimporium Demo Merchant
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/vite-react-template)
+Jimporium is a React storefront and Cloudflare Worker that demonstrates a
+merchant-side Universal Commerce Protocol (UCP) `2026-04-08` integration. It
+supports both its ordinary website checkout and an independently hosted
+conversational shopping agent.
 
-This template provides a minimal setup for building a React application with TypeScript and Vite, designed to run on Cloudflare Workers. It features hot module replacement, ESLint integration, and the flexibility of Workers deployments.
+## Responsibilities
 
-![React + TypeScript + Vite + Cloudflare Workers](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/fc7b4b62-442b-4769-641b-ad4422d74300/public)
+The merchant owns:
 
-<!-- dash-content-start -->
+- catalog data and authoritative server-side pricing;
+- UCP discovery, catalog, checkout, completion, and order resources;
+- payment-handler registration and dispatch by `handler_id`;
+- its Paze private key and Paze credential verification/decryption;
+- order creation and the redacted payment-evidence demo.
 
-🚀 Supercharge your web development with this powerful stack:
+The conversational flow submits payment only through the standard UCP
+`POST /checkout-sessions/{id}/complete` operation. No Paze-specific merchant
+endpoint is required. The existing `/api/orders` route serves the ordinary
+storefront checkout and uses the same internal verifier registry.
 
-- [**React**](https://react.dev/) - A modern UI library for building interactive interfaces
-- [**Vite**](https://vite.dev/) - Lightning-fast build tooling and development server
-- [**Hono**](https://hono.dev/) - Ultralight, modern backend framework
-- [**Cloudflare Workers**](https://developers.cloudflare.com/workers/) - Edge computing platform for global deployment
+The Paze browser implementation is loaded dynamically from the handler URL in
+the merchant profile. This repository has no build-time dependency on the
+handler repository and can be cloned and deployed independently.
 
-### ✨ Key Features
+## Local development
 
-- 🔥 Hot Module Replacement (HMR) for rapid development
-- 📦 TypeScript support out of the box
-- 🛠️ ESLint configuration included
-- ⚡ Zero-config deployment to Cloudflare's global network
-- 🎯 API routes with Hono's elegant routing
-- 🔄 Full-stack development setup
-- 🔎 Built-in Observability to monitor your Worker
+Requirements:
 
-Get started in minutes with local development or deploy directly via the Cloudflare dashboard. Perfect for building modern, performant web applications at the edge.
+- Node.js 20 or newer
+- A Paze sandbox client/profile and matching merchant decryption key
+- The independently hosted Paze browser-handler module
 
-<!-- dash-content-end -->
-
-## Getting Started
-
-To start a new project with this template, run:
-
-```bash
-npm create cloudflare@latest -- --template=cloudflare/templates/vite-react-template
-```
-
-A live deployment of this template is available at:
-[https://react-vite-template.templates.workers.dev](https://react-vite-template.templates.workers.dev)
-
-## Development
-
-Install dependencies:
+Install dependencies and create local configuration:
 
 ```bash
 npm install
+cp .dev.vars.example .dev.vars
 ```
 
-Start the development server with:
+Start Jimporium:
 
 ```bash
-npm run dev
+npm run dev -- --host 127.0.0.1
 ```
 
-Your application will be available at [http://localhost:5173](http://localhost:5173).
+The storefront and UCP REST service are available at
+`http://127.0.0.1:5173`.
 
-## Production
-
-Build your project for production:
+## Validation
 
 ```bash
-npm run build
+npm run validate
 ```
 
-Preview your build locally:
+This runs TypeScript/Vite builds, ESLint, and the merchant-owned Paze
+verification/decryption test. The test generates an ephemeral key pair and does
+not depend on files or secrets outside this repository.
+
+## Deployment notes
+
+The demo currently stores checkout sessions and orders in memory. Production
+deployment requires durable expiring storage, authenticated UCP requests,
+idempotency persistence, access control for payment evidence, and real payment
+authorization after Paze credential verification.
+
+Deploy the Worker with:
 
 ```bash
-npm run preview
+npm run deploy
 ```
-
-Deploy your project to Cloudflare Workers:
-
-```bash
-npm run build && npm run deploy
-```
-
-Monitor your workers:
-
-```bash
-npx wrangler tail
-```
-
-## Additional Resources
-
-- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
-- [Vite Documentation](https://vitejs.dev/guide/)
-- [React Documentation](https://reactjs.org/)
-- [Hono Documentation](https://hono.dev/)
