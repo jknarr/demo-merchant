@@ -1,4 +1,5 @@
 import type { MerchantPaymentDisplay } from "./payment-handlers";
+import { merchantState } from "./durable-state";
 
 export type MerchantOrderRecord = {
 	id: string;
@@ -16,12 +17,18 @@ export type MerchantOrderRecord = {
 	};
 };
 
-const orders = new Map<string, MerchantOrderRecord>();
-
-export function saveMerchantOrder(order: MerchantOrderRecord): void {
-	orders.set(order.id, order);
+export async function saveMerchantOrder(
+	runtimeEnv: object,
+	order: MerchantOrderRecord,
+): Promise<void> {
+	await merchantState(runtimeEnv).put(`order:${order.id}`, order);
 }
 
-export function getMerchantOrder(id: string): MerchantOrderRecord | undefined {
-	return orders.get(id);
+export async function getMerchantOrder(
+	runtimeEnv: object,
+	id: string,
+): Promise<MerchantOrderRecord | undefined> {
+	return (await merchantState(runtimeEnv).get(`order:${id}`)) as
+		| MerchantOrderRecord
+		| undefined;
 }

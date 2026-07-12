@@ -3,6 +3,8 @@ import { saveMerchantOrder } from "./order-store";
 import { verifyPaymentInstrument } from "./payment-handlers";
 import { registerUcpRoutes } from "./ucp";
 
+export { MerchantState } from "./durable-state";
+
 const app = new Hono<{ Bindings: Env }>();
 
 registerUcpRoutes(app);
@@ -58,7 +60,7 @@ app.post("/api/orders", async (c) => {
 	const orderId =
 		body.merchantOrderId ?? `JIM-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 	const attachedAt = new Date().toISOString();
-	saveMerchantOrder({
+	await saveMerchantOrder(c.env, {
 		id: orderId,
 		checkoutId: body.sessionId,
 		currency: body.currency ?? "USD",

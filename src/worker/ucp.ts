@@ -1,6 +1,7 @@
 import type { Context, Hono } from "hono";
 import { PRODUCTS } from "../react-app/data/products";
 import { getMerchantOrder, saveMerchantOrder } from "./order-store";
+import { merchantState } from "./durable-state";
 import {
 	paymentHandlerMetadata,
 	paymentHandlerProfile,
@@ -55,8 +56,6 @@ type StoredCheckout = {
 	payment?: StoredPayment;
 	orderId?: string;
 };
-
-const sessions = new Map<string, StoredCheckout>();
 
 function cents(value: number): number {
 	return Math.round(value * 100);
@@ -193,14 +192,22 @@ function computeCheckout(stored: StoredCheckout, baseUrl: string) {
 	};
 }
 
-function readSession(id: string): StoredCheckout | undefined {
-	const session = sessions.get(id);
+async function readSession(
+	runtimeEnv: object,
+	id: string,
+): Promise<StoredCheckout | undefined> {
+	const state = merchantState(runtimeEnv);
+	const session = (await state.get(`checkout:${id}`)) as StoredCheckout | undefined;
 	if (!session) return undefined;
 	if (session.expiresAt <= Date.now()) {
-		sessions.delete(id);
+		await state.delete(`checkout:${id}`);
 		return undefined;
 	}
 	return session;
+}
+
+async function writeSession(runtimeEnv: object, session: StoredCheckout): Promise<void> {
+	await merchantState(runtimeEnv).put(`checkout:${session.id}`, session);
 }
 
 function normalizeLines(lines: CheckoutLineRequest[] | undefined) {
@@ -340,18 +347,18 @@ function normalizeLines(lines: CheckoutLineRequest[] | undefined) {
 			expiresAt: Date.now() + SESSION_TTL_MS,
 			request: { ...body, line_items: normalizeLines(body.line_items) },
 		};
-		sessions.set(id, stored);
+		await writeSession(c.env, stored);
 		return c.json(computeCheckout(stored, publicBaseUrl(c)), 201);
 	});
 
-	app.get("/checkout-sessions/:id", (c) => {
-		const stored = readSession(c.req.param("id"));
+	app.get("/checkout-sessions/:id", async (c) => {
+		const stored = await readSession(c.env, c.req.param("id"));
 		if (!stored) return c.json({ code: "not_found", content: "Checkout not found or expired." }, 404);
 		return c.json(computeCheckout(stored, publicBaseUrl(c)));
 	});
 
 	app.put("/checkout-sessions/:id", async (c) => {
-		const stored = readSession(c.req.param("id"));
+		const stored = await readSession(c.env, c.req.param("id"));
 		if (!stored) return c.json({ code: "not_found", content: "Checkout not found or expired." }, 404);
 		if (["completed", "canceled"].includes(stored.status)) {
 			return c.json({ code: "conflict", content: `Checkout is ${stored.status}.` }, 409);
@@ -364,20 +371,22 @@ function normalizeLines(lines: CheckoutLineRequest[] | undefined) {
 			buyer: { ...stored.request.buyer, ...body.buyer },
 		};
 		stored.status = stored.payment ? "ready_for_complete" : "requires_escalation";
+		await writeSession(c.env, stored);
 		return c.json(computeCheckout(stored, publicBaseUrl(c)));
 	});
 
-	app.post("/checkout-sessions/:id/cancel", (c) => {
-		const stored = readSession(c.req.param("id"));
+	app.post("/checkout-sessions/:id/cancel", async (c) => {
+		const stored = await readSession(c.env, c.req.param("id"));
 		if (!stored) return c.json({ code: "not_found", content: "Checkout not found or expired." }, 404);
 		if (stored.status === "completed") return c.json({ code: "conflict", content: "Completed checkout cannot be canceled." }, 409);
 		stored.status = "canceled";
+		await writeSession(c.env, stored);
 		return c.json(computeCheckout(stored, publicBaseUrl(c)));
 	});
 
-	app.get("/orders/:id", (c) => {
+	app.get("/orders/:id", async (c) => {
 		const orderId = c.req.param("id");
-		const order = getMerchantOrder(orderId);
+		const order = await getMerchantOrder(c.env, orderId);
 		if (!order) {
 			return c.json(
 					{ code: "not_found", content: "Order was not found." },
@@ -407,7 +416,7 @@ function normalizeLines(lines: CheckoutLineRequest[] | undefined) {
 	});
 
 	app.post("/checkout-sessions/:id/complete", async (c) => {
-		const stored = readSession(c.req.param("id"));
+		const stored = await readSession(c.env, c.req.param("id"));
 		if (!stored) return c.json({ code: "not_found", content: "Checkout not found or expired." }, 404);
 		if (stored.status === "completed") return c.json(computeCheckout(stored, publicBaseUrl(c)));
 		if (stored.status !== "requires_escalation" && stored.status !== "ready_for_complete") {
@@ -424,6 +433,7 @@ function normalizeLines(lines: CheckoutLineRequest[] | undefined) {
 			);
 		}
 		stored.status = "complete_in_progress";
+		await writeSession(c.env, stored);
 		const checkout = computeCheckout(stored, publicBaseUrl(c));
 		let verified;
 		try {
@@ -438,6 +448,7 @@ function normalizeLines(lines: CheckoutLineRequest[] | undefined) {
 			});
 		} catch (error) {
 			stored.status = "requires_escalation";
+			await writeSession(c.env, stored);
 			return c.json(
 				{
 					code: "payment_failed",
@@ -457,8 +468,9 @@ function normalizeLines(lines: CheckoutLineRequest[] | undefined) {
 		};
 		stored.orderId = `JIM-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 		stored.status = "completed";
+		await writeSession(c.env, stored);
 		const completed = computeCheckout(stored, publicBaseUrl(c));
-		saveMerchantOrder({
+		await saveMerchantOrder(c.env, {
 			id: stored.orderId,
 			checkoutId: stored.id,
 			currency: completed.currency,

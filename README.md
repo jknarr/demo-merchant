@@ -60,10 +60,12 @@ not depend on files or secrets outside this repository.
 
 ## Deployment notes
 
-The demo currently stores checkout sessions and orders in memory. Production
-deployment requires durable expiring storage, authenticated UCP requests,
-idempotency persistence, access control for payment evidence, and real payment
-authorization after Paze credential verification.
+The Cloudflare deployment stores checkout sessions and orders in a named
+Durable Object, so conversational checkouts survive Worker isolate changes and
+redeployments. Records use application-level checkout expiration; a production
+deployment should additionally add scheduled cleanup, authenticated UCP
+requests, access control for payment evidence, and real payment authorization
+after Paze credential verification.
 
 Deploy the Worker with:
 
